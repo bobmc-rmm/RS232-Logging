@@ -1,0 +1,179 @@
+// -*- C++ -*-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+/**@file  BlackTerm.hi 
+ * @brief non-gui display on windows console
+ *
+ * Author: Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+ */ 
+
+#if !defined BlackTerm_hi
+#    define BlackTerm_hi
+
+// -------------------------------------------------------------------
+class BlackTerm {
+
+private:
+   int ctrlKey;
+   int keyChar;
+   int myLineItem;
+   int myScript;
+
+   enum { eKeyAlt = 0x22, eKeyNormal = 0x20, eKeyShift = 0x30,
+	  eKeyEsc = 0x1b
+   };
+
+public:
+
+   BlackTerm() { 
+      ctrlKey = keyChar = 0;
+      myLineItem = 0;
+      myScript = 0;
+   }
+
+   ~BlackTerm() { 
+   }
+
+   // ----------------------------------------------------------------
+private:
+   void charToPort(int k){
+      if( k != 0 ){
+	 char a[10];
+
+	 a[0] = k & 0xff;  a[1]=0;
+	 pPort->write( &a[0], 1 );
+      }
+   }
+   
+   // ----------------------------------------------------------------
+private:
+   void lineToPort(char *pLine, int eol){
+      int ch;
+      while( ch = *pLine++, ch != 0 ){
+	 if( ch >= ' ' ){
+	    charToPort( ch );
+	 }
+      }
+      if( eol == 0x0d0a ){
+	 charToPort(0x0d);
+      }
+      charToPort(0x0a);
+   }
+   // ----------------------------------------------------------------
+private:
+   void blankToPort(int eol){
+      if( eol == 0x0d0a ){
+	 charToPort(0x0d);
+      }
+      charToPort(0x0a);
+   }
+   
+   // ----------------------------------------------------------------
+   /// map keyboard to local variables
+private:
+   void getKeyCodes( void ){
+      static int prev;
+      int k;
+      Sleep(50);
+      k = pConsole->read();
+      ctrlKey = (k>>16) & 0xff;
+      keyChar = k & 0xff;
+      if( prev != k  && k != 0){
+	 //printf("new key: %x\n", k);
+	 prev = k;
+      }
+   }
+   
+
+   // ----------------------------------------------------------------
+   /// map keyboard to local variables
+private:
+   void waitMenuKey(void){
+      bool done = false;
+      while( !done ){
+	 getKeyCodes();
+	 //done = ( ctrlKey == eKeyNormal && keyChar != 0);
+	 done = ( keyChar >= eKeyEsc);
+      }
+   }
+
+   // ----------------------------------------------------------------
+   // output script lines
+private:
+   void doScript(void){
+      printf("\t<><><> script mode <><><>\n");
+      pScripts->print_menu();
+      printf("  select 1-9 or <esc>\n?");
+      waitMenuKey();
+      puts(".");
+      myScript = 0;
+      myLineItem = 0;
+      if( keyChar >= '1' && keyChar <= '9' ){
+	 myScript = keyChar - '0';
+      }
+      //myScript = 1;
+      bool done = false;
+      while( !done ){
+	 char * pLine = pScripts->getSelectedLine( myScript, myLineItem);
+	 if( pLine == NULL ){
+	    //printf("     <> End Script <>\n");
+	    //int eol = pScripts->getScriptEol( myScript );
+	    //lineToPort(" ",eol);
+	    //blankToPort(eol);
+	    return;
+	 }
+	 myLineItem++;
+
+	 if( strncmp(pLine,"__WAIT",6)==0 ){
+	    int lineWait = atoi(&pLine[6]);
+	    //printf(" ...delay %d seconds\n",lineWait);
+	    Sleep(1000 * lineWait);
+	    continue;
+	 }
+
+	 //printf("::: %s\n",pLine);
+	 int eol = pScripts->getScriptEol( myScript );
+	 lineToPort(pLine,eol);
+	 Sleep(500);
+	 //puts("||");
+
+	 // send line
+      }
+      
+   }
+
+   // ----------------------------------------------------------------
+   // print key to serial port or select script mode
+public:
+   void monitorConsole(void){
+      getKeyCodes();
+      if ( keyChar == eKeyEsc){
+	 doScript();
+	 return;
+      }
+
+      //if( ctrlKey == eKeyNormal || ctrlKey == eKeyShift){
+	 charToPort( keyChar);
+	 //}
+      return;
+   }
+
+private:
+};
+
+#endif // #    define BlackTerm_hi
+/*
+boot device          : 0
+processor number     : 0
+host name            :
+file name            :
+inet on ethernet (e) :
+inet on backplane (b):
+host inet (h)        :
+gateway inet (g)     :
+user (u)             :
+ftp password (pw) (blank = use rsh):
+flags (f)            : 0x0
+target name (tn)     :
+startup script (s)   :
+other (o)            :
+*/

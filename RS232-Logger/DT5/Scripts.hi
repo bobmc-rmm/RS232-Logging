@@ -1,0 +1,333 @@
+// -*- C++ -*-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+/**@file  Scripts.hi 
+ * @brief program scripting 
+ * 
+ * Author: Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+ */ 
+#if !defined Scripts_hi
+#    define Scripts_hi
+
+enum { eNumScripts = 11, eMaxLines = 20, eMaxLineLen = 128 };
+   
+char temp[eMaxLineLen];
+typedef struct {
+   int index;
+   int eol_type;		// crlf or just lf
+   char lines[eMaxLines][eMaxLineLen];
+}SCRIPT_T;
+
+typedef struct {
+   int index;
+   char lines[eNumScripts][eMaxLineLen];
+}MENU_T;
+
+SCRIPT_T scripts[eNumScripts];
+MENU_T menu_t;
+
+class Scripts {
+
+private:
+   int scriptNum;
+   int eol;
+   enum { BSIZE=80 };
+   char words[BSIZE+2];
+   char *pWord1;
+   char *pWord2;
+
+public:
+   Scripts(){      
+      int i;
+      //handle=NULL;
+      scriptNum = 0;
+      //char *pLine;
+      eol = 0x0a; // default unix type line end
+      for( i=0; i<eNumScripts; i++ ){
+	 strcpy(&menu_t.lines[i][0],"NA");
+      }
+
+      /* for( i=0; i<eNumScripts; i++ ){
+	 scripts[i].eol_type = eol;
+	 for(j=0; j< eMaxLines; j++){
+	    pLine = &scripts[i].lines[j][0];
+	    sprintf(pLine,"%2d %2d",i,j);
+	 }
+	 }*/
+   }
+
+   ~Scripts(){
+   }
+
+   
+   //--------------------------------------------------------------------
+   /// print scripts
+private:
+   void print_scripts(void){
+      int i,j;
+      for( i=0; i<eNumScripts; i++ ){
+	 printf(" -------- printing script ---- %d\n",i);
+	 for(j=0; j< eMaxLines; j++){
+	    if( j < scripts[i].index ){
+	       char *pLine = &scripts[i].lines[j][0];
+	       printf(";; %s\n",pLine);
+	    }
+	 }
+      }
+   }
+
+   //--------------------------------------------------------------------
+   /// addrs of a line item for update, use script 0 if bad select
+private:
+   char * getScriptLine( int snum ){
+      if( snum >= eNumScripts || snum < 0 ) snum = 0;
+      int i = scripts[snum].index;
+      if( i >= eMaxLines || i < 0 ) i = 0;
+      char *p = &scripts[snum].lines[i][0];
+      return p;
+   }
+
+   //--------------------------------------------------------------------
+   /// addrs of script line selection
+public:
+   char * getSelectedLine( int snum, int lineItem){
+      if( snum >= eNumScripts || snum < 0 ) return NULL;
+      int i = scripts[snum].index;
+      if( i >= eMaxLines || i < 0 ) return NULL;
+      if( lineItem >= i ) return NULL;
+      char *p = &scripts[snum].lines[lineItem][0];
+      return p;
+   }
+
+   //--------------------------------------------------------------------
+   /// addrs of script endline option
+public:
+   int getScriptEol( int snum ){
+      if( snum >= eNumScripts || snum < 0 ) return 0;
+      return scripts[snum].eol_type;
+   }
+
+   //--------------------------------------------------------------------
+   /// test if title line or start of script
+private:
+   bool isTitle( char *pt ){
+      if( pt[0] == '{' && pt[1] == '{' ){
+	 scriptNum = pt[2] - '0';
+	 if( scriptNum >= eNumScripts || scriptNum < 0 ) scriptNum = 0;
+	 scripts[scriptNum].index = 0;
+	 return true;
+      }
+      return false;
+   }
+   //--------------------------------------------------------------------
+   /// test if end of script. If so, close it by using script 0
+private:
+   bool isScriptEnd( char *pt ){
+      if( pt[0] == '}' && pt[1] == '}' ){
+	 scriptNum = 0;
+	 scripts[scriptNum].index = 0;
+	 return true;
+      }
+      return false;
+   }
+
+   //--------------------------------------------------------------------
+   /// test if comment
+private:
+   bool isComment( char *pt ){
+      if( pt[0] == '#' && pt[1] == '#' ){
+	 return true;
+      }
+      return false;
+   }
+
+private:
+   bool extractParamWords( char *pt ){
+      int i,ch, len;
+      bool bSplit = false;
+      //printf(":params: %s\n",pt);
+      strncpy(words,pt,BSIZE);
+      len = strlen(words);
+      pWord1 = &words[0];
+      pWord2 = NULL;
+      for( i=0; i<len; i++ ){
+	 ch = words[i];
+	 if( ch == '=' ) {
+	    words[i] = 0;
+	    pWord2 = &words[i+1];
+	    return true;
+	 }
+	 
+      }
+      return false;
+   }
+
+   //--------------------------------------------------------------------
+   /// handle parameter
+private:
+   bool isParameter( char *pt ){
+      if( pt==NULL ) return false;
+      
+      bool bReturn = ( pt[0] == '|' && pt[1] == '|' );
+      if( bReturn){
+	 if( extractParamWords( &pt[2] ) == false ){
+	    return bReturn;
+	 }
+	 if( strcmp(pWord1,"COMMPORT") == 0 ){
+	    if( commNumber < 1 ){
+	       // only if not set on command line
+	       commNumber = atoi(pWord2);
+	    }
+	    return bReturn;
+	 }
+
+	 if( strcmp(pWord1,"COMMBAUD") == 0 ){
+	    if( commBaud < 1 ){
+	       // only if not set on command line
+	       commBaud = atoi(pWord2);
+	    }
+	    return bReturn;
+	 }
+	 return bReturn;
+      }
+      return bReturn;
+   }
+
+   //--------------------------------------------------------------------
+   /// skip tabs and leading spaces, removed linefeed
+private:
+   char * trim( char *pt ){
+      int i,sz = strlen(pt);
+      char *pStart = pt;
+      for(i=0; i<sz; i++ ){
+	 if( pt[i] != ' ' && pt[i] != '\t') break;
+      }
+      pStart = &pt[i];
+      i = strlen(pStart);
+      while( i > 0 ) {
+	 i -= 1;
+	 if( pStart[i] == 0x0d || pStart[i] == 0x0a ){
+	    pStart[i] = 0; // drop line feed
+	 }
+      }
+      return pStart;
+   }
+
+   //--------------------------------------------------------------------
+   /// print menu
+public:
+   void print_menu(){
+      //printf(" +++ %s Script Menu +++\n",PROGRAM);	
+      for( int i=0; i<eNumScripts; i++ ){
+	 char *pLine = &menu_t.lines[i][2];
+	 if( strcmp(pLine,"NA")){
+	    if( strlen(pLine) > 3 ){
+	       printf("%s\n",pLine);
+	    }
+	 }
+      }
+   }
+
+   //--------------------------------------------------------------------
+   /// set end of line terminator for a script
+private:
+   bool isEolOption( char *pt ){
+      eol = 0x0a;
+      if( pt[0] == '\\' ){
+	 if( pt[1] == 'r' ){
+	    eol = 0x0d0a;
+	 }
+	 return true;
+      }
+      return false;
+   }
+
+   //--------------------------------------------------------------------
+   /// process line
+private:
+   void process_line( char *pLine ){
+      int sz;
+      sz = strlen(pLine);
+      //printf("SIZE: %d :%s\n",sz, pLine);
+
+      if( sz >= eMaxLineLen-4 ){
+	 printf("TOO LONG:-- %s", pLine);
+	 return;
+      }
+
+      if( isComment(pLine) ){
+	 //printf("%s\n",pLine);
+	 return;
+      }
+
+      if( isParameter(pLine)){
+	 return;
+      }
+
+      if( isScriptEnd(pLine)){
+	 return;
+      }
+
+      if( isEolOption(pLine)){
+	 scripts[scriptNum].eol_type = eol;
+	 //printf("Script: %d EOL: %x\n",scriptNum,eol);
+	 return;
+      }
+      if( isTitle(pLine) ){
+	 //printf("%s\n",pLine);	
+	 strncpy(&menu_t.lines[scriptNum][0],pLine, eMaxLineLen-4);
+	 return;
+      }
+
+      // after checking other options, handle one line of script
+      if( scripts[scriptNum].index < eMaxLines ){
+	 char *pDst = getScriptLine( scriptNum );
+	 strncpy(pDst,pLine, eMaxLineLen-4);
+	 scripts[scriptNum].index++;
+      }
+      
+
+   }
+
+   //--------------------------------------------------------------------
+   /// read script from file, parse scripts into structures, create menu
+public:
+   void fromFile() {
+      int lc = 0;
+      FILE *handle;
+      if ((handle = fopen(INI_FILE, "r")) == NULL) {
+	 fprintf(stderr, "Can't open file %s\n", INI_FILE);
+	 return;
+      }
+
+      //printf("\n[opened %s]\n", INI_FILE);
+      bool done = false;
+      while( !done ) {
+	 char *pLine;
+	 char *p = fgets( temp, eMaxLineLen-4, handle);
+	 if( p==NULL ) {
+	    if( lc < 1 ){
+	       fprintf(stderr, "Can't read file %s\n", INI_FILE);
+	    }
+	    break;
+	 }
+	 lc++;
+	 pLine = trim(temp);
+	 process_line( pLine );
+      } // !done
+
+      //print_menu();
+      //puts("==============");
+      //print_scripts();
+      if( handle != NULL ){
+	 fclose(handle);
+	 //printf("[closed %s]\n\n", INI_FILE);
+      }
+      printf( "\n %s %s\n\n",PROGRAM,PDATE );
+      printf(" press <esc> for menu option\n");
+      return;
+   }
+
+private:
+}; // end class
+
+#endif // #    define Scripts_hi

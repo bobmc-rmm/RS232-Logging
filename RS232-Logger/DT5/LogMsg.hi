@@ -1,0 +1,83 @@
+// -*- C++ -*-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+/**@file  LogMsg.hi
+ * @brief writes shot data 
+ * 
+ * Author: Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+ */ 
+
+#if !defined LogMsg_hi
+#    define LogMsg_hi
+#include <fcntl.h>
+//#include <io.h>
+//#include <sys\types.h>
+//#include <sys\stat.h>
+
+//--------------------------------------------------------------------
+class LogMsg {
+
+private:
+   FILE *pFile;
+   //int pFile;
+   bool isOpen;
+   char fname[64];
+   //char obuff[256];
+
+public:   
+   //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+   /// \b Summary:  write test pattern to file
+   /// \brief write file
+   LogMsg(void){
+      isOpen = false;
+      int lc = 0;
+      make_name();
+      if( pFile = fopen(fname, "w"), pFile == NULL) {
+	 fprintf(stderr, "Can't open file %s\n", fname);
+	 exit(1);
+      }
+      isOpen = true;
+      write_log(fname);
+      write_log("hello world");
+   }
+   //sprintf(omsg, "Starting self test\n");
+   
+private:
+   //--------------------------------------------------------------------
+   void make_name(void){
+      time_t seconds;
+      struct tm *lt;
+      time( &seconds );
+      lt = localtime(&seconds);	// initialize structure
+
+      sprintf(fname,"DT2_%d%02d%02d%02d%02d%02d.txt", 
+	     lt->tm_year - 100 + 2000,
+	     lt->tm_mon+1,
+	     lt->tm_mday,
+	     lt->tm_hour,
+	     lt->tm_min,
+	     lt->tm_sec );
+      puts(fname);
+   }
+
+
+   //--------------------------------------------------------------------
+   /// write to file
+public:
+   void write_log( const char *pMsg ){
+      fprintf(pFile,"%s\n",pMsg);
+      fflush(pFile);
+      //sprintf(obuff,"%s\n",pMsg);
+      //write(pFile,obuff,strlen(obuff));
+   }
+
+   //--------------------------------------------------------------------
+   /// Clean up
+   ~LogMsg(){
+      write_log("DT2 Goodbye..");
+      fclose(pFile);
+   }
+
+};
+
+
+#endif // #define LogMsg_hi

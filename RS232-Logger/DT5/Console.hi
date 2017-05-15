@@ -1,0 +1,130 @@
+// -*- C++ -*-
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+/**@file  console.hi 
+ * @brief Console.hi 
+ *  
+ * Author: Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+*/ 
+#if !defined console_hi
+#    define console_hi
+
+class Console {
+
+private:
+#if defined WIN32
+   HANDLE hOut;
+   HANDLE hIn; 
+#endif
+
+public:
+   Console() {
+#if defined WIN32
+      hOut = 0;
+      hIn = 0; 
+      DWORD fdwSaveOldMode; 
+      AllocConsole();
+      if( hOut = GetStdHandle(STD_OUTPUT_HANDLE), 
+	  hOut == INVALID_HANDLE_VALUE){
+	 exit(1);
+      }
+      hIn = GetStdHandle(STD_INPUT_HANDLE); 
+      if (hIn == INVALID_HANDLE_VALUE) {
+	 ErrorExit("GetStdHandle"); 
+      }
+      // Save the current input mode, to be restored on exit. 
+      if (! GetConsoleMode(hIn, &fdwSaveOldMode) ) {
+	 ErrorExit("GetConsoleMode"); 
+      }
+#endif   
+   }
+
+public:
+   ~Console() {
+   }
+
+
+   //--------------------------------------------------------------------
+public:
+   int read(void) {
+      int k = 0;
+#if defined WIN32
+      DWORD numRecs;
+      INPUT_RECORD inBuff[128]; 
+      if (! ReadConsoleInput( hIn, inBuff, 128, &numRecs) ){
+	 ErrorExit("ReadConsoleInput"); 
+      }
+      
+      // Dispatch the events to the appropriate handler. 
+      k = KeyEventProc(inBuff[0].Event.KeyEvent); 
+#endif
+      return k;
+   }
+
+   //--------------------------------------------------------------------
+   /// @brief writes to the win32 console
+public:
+   void writeChar(int ch){
+#if defined WIN32
+      DWORD tmp;
+      if( hOut ){
+	 char a[2];
+	 a[1] = 0;
+	 a[0] = (char)(ch & 0xff);
+	 WriteConsole( hOut, &a[0], 1, &tmp, NULL);
+      }
+#endif
+   }
+
+   //--------------------------------------------------------------------
+   /// @brief writes to the win32 console
+public:
+   void write( const char *pmsg ){
+#if defined WIN32
+      DWORD tmp;
+      if( hOut ){
+	 DWORD len = strlen(pmsg);
+	 WriteConsole( hOut, pmsg, len, &tmp, NULL);
+      }
+#endif
+   }
+
+   //--------------------------------------------------------------------
+   /// @brief writes to the win32 console
+public:
+   void writeLine(char *pmsg, int len){
+#if defined WIN32
+      DWORD tmp;
+      if( hOut ){
+	 WriteConsole( hOut, pmsg, len, &tmp, NULL);
+      }
+#endif
+   }
+
+#if defined WIN32
+   //--------------------------------------------------------------------
+   int KeyEventProc(KEY_EVENT_RECORD ker){
+      int k=0;
+      int cs=0;
+      if(ker.bKeyDown){
+	 cs = (int)ker.dwControlKeyState;
+	 k = cs<<16;
+	 k |= ker.uChar.AsciiChar;
+	 // printf(" keys pressed x%x\n", k);
+      }
+      return k;
+   }
+#endif
+
+   //--------------------------------------------------------------------
+private:
+   VOID ErrorExit(char * pMsg){ 
+      fprintf(stderr, "%s\n", pMsg); 
+      ExitProcess(0); 
+   }
+   
+   
+
+
+private:
+};
+#endif // #    define console_hi

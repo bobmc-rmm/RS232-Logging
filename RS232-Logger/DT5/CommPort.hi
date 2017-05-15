@@ -1,0 +1,328 @@
+// -*- C++ -*-
+/** @file CommPort.hi
+ * WIN32 serial port for laser emulator using RS232COMM port
+
+ * Author: Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+ */
+
+class CommPort {
+
+public:
+   enum {
+      eNOCOM,			///< no comm
+      ePORT1,			///< comm1
+      ePORT2,			///< comm2
+      ePORT3,			///< comm3
+      ePORT4,			///< comm4
+      ePORT5,			///< comm5
+      ePORT6,			///< comm6
+      ePORT7,			///< comm7
+      ePORT8,			///< comm8
+      ePORT_ARRAY_SIZE		///< to size an array
+   };
+
+private:
+
+   enum {
+      OMSG_MAX = 79,
+      IMSG_MAX = 79,
+      RING_SIZE = 4096
+   };
+
+   char imsg[IMSG_MAX+1];
+   char omsg[OMSG_MAX+1];
+
+   bool isOpen;
+
+   HANDLE hcom;
+   char *head;
+   char *tail;
+   char *endpt;
+   char *begpt;
+   int numTxBytes;
+   int numRxBytes;
+   int errorNum;
+   int bytesToRead;
+
+public:
+   enum {
+      NIL_DATA = 9999 // a number greater than 255
+   };
+
+   enum {
+      eCportErr1=101,
+      eCportErr2,
+      eCportErr3,
+      eCportErr4,
+      eCportErr5,
+      eCportErr6,
+      eCportErr7
+   };
+
+   // ---------------------------------------------------------------------
+   /// constructs serial port handler that only works for WIN32. Presets
+   /// variables.
+public:
+   CommPort(  ){
+      //bool ret = false;
+      //return ret;
+      isOpen = false;
+      errorNum = 0;
+      bytesToRead = 0;
+      hcom = 0;
+   }
+   ~CommPort() {}
+
+   // ---------------------------------------------------------------------
+   /// opens the WIN32 serial port, sets the baud rate.
+   /// @param portSel .. the serial port number (1 to 8)
+   /// @param baud .. the baud rate
+   /// @return .. true if success
+public:
+   bool open( int portSel, int baud ){
+
+#if defined( WIN32 )
+      bool ret = false;
+      DCB dcb;
+      static char buff[RING_SIZE+1];
+      bytesToRead = 0;
+
+      if( isOpen==true ) {
+	 errorNum = eCportErr1;
+	 return false;		// error since already open
+      }
+      isOpen = false;
+      if( portSel < ePORT1 || portSel > ePORT8 ){
+	 errorNum = eCportErr1;
+	 return false;		// boundary error
+      }
+
+      begpt = &buff[0];
+																					   
+      endpt = begpt + RING_SIZE;
+      tail = head = begpt;
+
+      COMMTIMEOUTS t;
+
+      hcom = \
+	 CreateFile(
+		    portnumToName(portSel),
+		    GENERIC_READ | GENERIC_WRITE,
+		    0,  // comm devices  w/exclusive-access
+		    NULL, /* no security attrs */
+		    OPEN_EXISTING, // comm devices must use OPEN_EXISTING
+		    0,  // not overlapped I/O 
+		    NULL  // hTemplate must be NULL for comm devices
+		    );
+
+      if (hcom == INVALID_HANDLE_VALUE) {
+	 errorNum = eCportErr3;
+	 return false;
+      }
+
+      GetCommTimeouts(hcom,&t);
+
+      t.ReadIntervalTimeout = 0;
+      t.ReadTotalTimeoutMultiplier = 0;
+      t.ReadTotalTimeoutConstant = 0; 
+      t.WriteTotalTimeoutMultiplier = 0;
+      t.WriteTotalTimeoutConstant= 0; 
+
+      SetCommMask( hcom, EV_RXCHAR ) ;
+
+      isOpen = GetCommState(hcom, &dcb);
+      if(isOpen != true ) {
+	 errorNum = eCportErr4;
+	 return false;
+      }
+
+      dcb.BaudRate = baud;
+      dcb.ByteSize = 8;
+      dcb.Parity = NOPARITY;
+      dcb.StopBits = ONESTOPBIT;
+      dcb.fInX = dcb.fOutX = false ;
+      dcb.fDtrControl = DTR_CONTROL_DISABLE ;
+      dcb.fRtsControl = RTS_CONTROL_DISABLE ;
+      dcb.fOutxCtsFlow = false;
+      dcb.fOutxDsrFlow = false;
+      dcb.fDsrSensitivity = false;
+      dcb.fAbortOnError = false;
+      dcb.wReserved = 0;
+
+      isOpen = SetCommState(hcom, &dcb);
+      if(isOpen != true ) {
+	 errorNum = eCportErr5;
+	 return false;
+      }
+
+      SetCommTimeouts( hcom, (COMMTIMEOUTS *)&t );
+      PurgeComm( hcom,PURGE_TXABORT
+		 |PURGE_RXABORT
+		 |PURGE_TXCLEAR
+		 | PURGE_RXCLEAR ) ;
+
+      isOpen = true;
+#else
+      isOpen = false;
+#endif
+      return isOpen; 
+   }
+
+   // ---------------------------------------------------------------------
+   /// write a string/message to an open serial port
+   /// @param pMsg .. the msg
+   /// @param len .. number of bytes in msg
+public:
+   bool write( char *pMsg, int len ){
+      bool ret = false;
+
+#if defined( WIN32 )
+      DWORD  nBytes=0;
+      if( isOpen == false ) return false;
+      if( len < 1 ){
+	 return ret;
+      }
+      ret = WriteFile( hcom, pMsg, len, &nBytes, NULL) ;
+      if( ret != true ){
+	 //cout << "Comm WriteFile Failed " << endl;
+      }
+#endif
+
+      return ret;
+   }
+
+   // ---------------------------------------------------------------------
+   /// get  status
+public:
+   bool getOpen( ){
+      return isOpen;
+   }
+
+   // ---------------------------------------------------------------------
+   /// get last error
+public:
+   int getErrorNum( ){
+      return errorNum;
+   }
+
+   // ---------------------------------------------------------------------
+   /// The App should first call close before attempting open.
+public:
+   void  close( void ){
+#if defined( WIN32 )
+      bool ret = false;
+      if( isOpen == false ){
+	 return;		// already closed
+      }
+
+      SetCommMask( hcom, 0 ) ;
+      EscapeCommFunction( hcom, CLRDTR ) ;
+      PurgeComm( hcom, PURGE_TXABORT | PURGE_RXABORT |
+		 PURGE_TXCLEAR | PURGE_RXCLEAR ) ;
+      CloseHandle( hcom);
+      hcom = 0;
+      isOpen = false;
+#endif
+      return;
+   }
+
+   // ---------------------------------------------------------------------
+   /// reads from the open serial port.
+   /// If there is data in the queue, store in a ring buffer for external
+   /// parsing. This port is non-blocking. The main App schedules regular
+   /// polling.
+   /// @return .. true if some data was read
+public:
+   bool read( void ){
+      bool gotSome = false;
+
+#if defined( WIN32 )
+
+      bool b;
+      COMSTAT  ComStat ;
+      DWORD  dwErrorFlags, nBytes=0;
+      int   i,maxBytes;
+      char msg[10];
+
+      if( isOpen == false ) return false;
+
+      ClearCommError( hcom, &dwErrorFlags, &ComStat ) ;
+      maxBytes = ComStat.cbInQue;
+      if( maxBytes < 1){
+	 return false;  // no data received yet
+      }
+
+      for( i=0; i < maxBytes; i++ ){
+	 b = ReadFile( hcom, msg, 1, &nBytes, NULL) ;
+	 if( nBytes < 1 ) {
+	    break;
+	 }
+	 gotSome = true;
+	 // copy the queue to the input ring buffer
+	 *tail++ = msg[0];
+	 if ( tail == endpt){
+	    tail = begpt;
+	 }
+	 if( tail == head)  {
+	    // overflow - move head to discard
+	    head++;
+	    if( head == endpt) {
+	       head = begpt;
+	    }
+	 }
+      }
+
+
+#else
+      gotSome = false;
+#endif
+      return gotSome;
+   }
+
+   // ---------------------------------------------------------------------
+   /// get char from the ring buffer.
+   ///
+   /// The app should first call read() once to load the buffer, then call
+   /// here while parsing it's contents.
+   /// @return byte from ring buffer or zero if empty
+public:
+   int getRingChar( ){
+      int ch;
+      bool b;
+      if( head == tail ){
+	 b = read();		// if empty, read more
+	 if( b == false ){
+	    return NIL_DATA;
+	 }
+      }
+      if( head == tail ){
+	 return NIL_DATA;
+      }
+      ch = (*head++) & 0xff; 
+      if( head == endpt ) head = begpt;
+      return ch; // number (0 - 255)
+   }
+
+   // ---------------------------------------------------------------------
+   /// test if has data
+   ///
+   /// @return true if has data
+public:
+   bool hasData( ){
+      return ( head != tail ) ? true : false;
+   }
+
+   // ---------------------------------------------------------------------
+public:
+   const char * portnumToName( int pnum ){
+      static char *names[ePORT_ARRAY_SIZE] = { 
+	 "NOCOM",
+	 "COM1", "COM2", "COM3", "COM4", 
+	 "COM5", "COM6", "COM7", "COM8"
+      };
+      if( pnum < 1 || pnum >= ePORT_ARRAY_SIZE ){ pnum = 0; }
+      return names[pnum];
+   }
+   
+}; //Cport.cpp CommPort
+

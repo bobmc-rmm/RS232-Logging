@@ -1,0 +1,66 @@
+// -*- C++ -*-
+
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++ 
+/** @file Changelog.txt
+ * @brief contains general description or overview of releases 
+ * 
+ * Contains overview of releases.
+ *
+ */ 
+
+//--------------------------------------------------------------------
+/** \page changes_ Changelog (RS232 Serial Logger)
+ 
+ \par bm2017.may.14b
+ - created package for Visual Studio 2017 Community Edition
+ - the program compiled and loopback test ok.
+ - release rc01 for GitHub reference
+
+ \par bm2017.may.14a
+ - Found old logger code, compiled again with Watcom
+ - checked serial port loopback
+
+<hr>
+
+ end page changes
+*/ 
+
+//--------------------------------------------------------------------
+/** \page release_notes_ Digitizer Extraction Release Notes
+
+ \par release_rc01
+<hr>
+ end page release notes
+*/ 
+
+
+//--------------------------------------------------------------------
+/**  @mainpage RS232 Serial Logger
+
+\anchor top_
+  The Serial Logger (_rc01) has these features
+  - builds with Visual Studio 2017
+  - runs on 32-bit Windows 10
+  - logs all the serial port data to auto-named files
+  - COMM1 starts with: 'dt5.exe -A1 -B9600' for example
+
+<br>
+
+  \todo
+  - create optional DLL
+  - create optional GUI such as Windows Form with C#
+
+<br>
+  - See \ref changes_ for daily changelog
+
+<br>
+.. | Information
+:------ | :----------------------------
+Project | RS232 
+Author  | Robert M. McIsaac (aka Bob); 20573098.inc, Ontario, Canada
+Date    | 2017.may.14
+<br>
+
+ end Mainpage 
+*/ 
+
